@@ -1,4 +1,6 @@
 /**
+ * TODO - test the sit out of this
+ * 
  * @template DataType - The type of data that the response holds.
  * @template CustomError - Optional custom implementation for errors (defaults to `string` if not defined).
  *
@@ -40,11 +42,11 @@
  *
  * @author Gabriel Spinola
  */
-export default class Result<DataType, CustomError = string | unknown | Error> {
-    private _data: DataType | null;
-    private _error: CustomError | null;
+export default class Result<DataType = MaybeData, CustomError = MaybeError> {
+    private _data: DataType;
+    private _error: CustomError;
 
-    private constructor(data: DataType | null, error: CustomError | null) {
+    private constructor(data: DataType, error: CustomError) {
         this._data = data;
         this._error = error;
     }
@@ -59,8 +61,8 @@ export default class Result<DataType, CustomError = string | unknown | Error> {
      * const success = Result.succeed("Operation succeeded");
      * console.log(success.data); // "Operation succeeded"
      */
-    static succeed<DataType, E = unknown>(data: DataType): Result<DataType, E> {
-        return new Result<DataType, E>(data, null);
+    static succeed<DataType>(data: DataType): Result<DataType, null> {
+        return new Result(data, null);
     }
 
     /**
@@ -73,7 +75,7 @@ export default class Result<DataType, CustomError = string | unknown | Error> {
      * const failure = Result.failed("Something went wrong");
      * console.log(failure.error); // "Something went wrong"
      */
-    static failed<CustomError = string | unknown>(
+    static failed<CustomError = AnyError>(
         error: CustomError,
     ): Result<null, CustomError> {
         return new Result(null, error);
@@ -99,14 +101,14 @@ export default class Result<DataType, CustomError = string | unknown | Error> {
      *   console.error("Error:", result.error);
      * }
      */
-    static runCatching<DataType, E = unknown>(
+    static runCatching<DataType extends MaybeData>(
         fn: () => DataType,
-    ): Result<DataType | null, E | Error> {
+    ): Result<MaybeData, MaybeError> {
         try {
             const result = fn();
-            return Result.succeed<DataType, E>(result);
+            return Result.succeed<DataType>(result);
         } catch (error) {
-            return Result.failed<E | Error>(error as E | Error);
+            return Result.failed<AnyError>(error as AnyError);
         }
     }
 
@@ -164,8 +166,8 @@ export default class Result<DataType, CustomError = string | unknown | Error> {
      * const success = Result.succeed("Valid data");
      * console.log(success.data); // "Valid data"
      */
-    get data(): DataType | null {
-        return this._data;
+    get data(): MaybeData {
+        return this._data as MaybeData;
     }
 
     /**
@@ -177,8 +179,8 @@ export default class Result<DataType, CustomError = string | unknown | Error> {
      * const failure = Result.failed("An error occurred");
      * console.log(failure.error); // "An error occurred"
      */
-    get error(): CustomError | null {
-        return this._error;
+    get error(): MaybeError {
+        return this._error as MaybeError;
     }
 
     /**
@@ -207,3 +209,13 @@ export default class Result<DataType, CustomError = string | unknown | Error> {
         return this._error !== null;
     }
 }
+
+export type Nothing = null;
+
+export type MaybeError = Error | string | null
+export type MaybeData = NonNullable<unknown> | null
+
+/**
+ * @todo - Using this outside the Result class is a bad practice for large scale projects. Prefer using custom error classes
+ */
+export type AnyError = string | Error
