@@ -5,7 +5,7 @@
  * @template CustomError - Optional custom implementation for errors (defaults to `string` if not defined).
  *
  * @description
- * The `Result` class represents a common response pattern, where the response can either indicate success with valid data or failure with an error.
+ * The `Result` class represents a common response pattern, where the response can either indicate success with valid data, failure with an error, or a pending state.
  * It is designed to ensure that operations wrapped in a `Result` are type-safe and predictable, especially when used with Promises.
  *
  * **Important:**
@@ -16,11 +16,13 @@
  * // Example 1: Using Result directly
  * const successResponse = Result.succeed({ id: 1, name: "John Doe" });
  * const errorResponse = Result.failed("User not found");
+ * const pendingResponse = Result.pending();
  *
  * console.log(successResponse.isSuccess); // true
  * console.log(successResponse.data); // { id: 1, name: "John Doe" }
  * console.log(errorResponse.isError); // true
  * console.log(errorResponse.error); // "User not found"
+ * console.log(pendingResponse.isPending); // true
  *
  * @example
  * // Example 2: Using Result with a Promise
@@ -32,9 +34,11 @@
  * }
  *
  * const result = await examplePromise();
- * const { data, error } = result.unwrap();
+ * const { data, error, isPending } = result.unwrap();
  *
- * if (error) {
+ * if (isPending) {
+ *   console.log("Loading..."); // Handles pending state
+ * } else if (error) {
  *   console.error("Error:", error); // Handles error safely
  * } else {
  *   console.log("Success:", data); // Output success value
@@ -45,10 +49,12 @@
 export default class Result<DataType = MaybeData, CustomError = MaybeError> {
     private _data: DataType;
     private _error: CustomError;
+    private _isPending: boolean;
 
-    private constructor(data: DataType, error: CustomError) {
+    private constructor(data: DataType, error: CustomError, isPending: boolean = false) {
         this._data = data;
         this._error = error;
+        this._isPending = isPending;
     }
 
     /**
@@ -79,6 +85,19 @@ export default class Result<DataType = MaybeData, CustomError = MaybeError> {
         error: CustomError,
     ): Result<null, CustomError> {
         return new Result(null, error);
+    }
+
+    /**
+     * Creates a pending `Result` instance.
+     * 
+     * @returns A `Result` instance representing a pending state.
+     * 
+     * @example
+     * const pending = Result.pending();
+     * console.log(pending.isPending); // true
+     */
+    static pending<DataType, CustomError>(): Result<DataType | null, CustomError | null> {
+        return new Result(null, null, true);
     }
 
     /**
@@ -113,48 +132,40 @@ export default class Result<DataType = MaybeData, CustomError = MaybeError> {
     }
 
     /**
-     * Handles the success and error cases using provided callbacks.
+     * Handles the success, error, and pending cases using provided callbacks.
      *
      * @param onSuccess - A callback executed with the data in the success case.
      * @param onError - A callback executed with the error in the failure case.
+     * @param onPending - A callback executed when the result is pending.
      * @returns The result of the callback execution.
-     *
-     * @example
-     * const result = Result.succeed(42);
-     * const message = result.match(
-     *   (data) => `Success with data: ${data}`,
-     *   (error) => `Failed with error: ${error}`
-     * );
-     * console.log(message); // "Success with data: 42"
      */
     match<T>(
         onSuccess: (data: DataType) => T,
         onError: (error: CustomError) => T,
+        onPending?: () => T,
     ): T {
+        if (this._isPending) {
+            return onPending ? onPending() : onError(null as CustomError);
+        }
         return this.isSuccess
             ? onSuccess(this._data as DataType)
             : onError(this._error as CustomError);
     }
 
     /**
-     * Unwraps the `Result` into a discriminated union of success or error.
-     *
-     * @returns An object where either `data` is defined and `error` is `null`, or vice versa.
-     *
-     * @example
-     * const result = Result.failed("Error occurred");
-     * const { data, error } = result.unwrap();
-     * console.log(data); // null
-     * console.log(error); // "Error occurred"
+     * Unwraps the `Result` into a discriminated union of success, error, or pending state.
      */
     unwrap():
-        | { data: DataType; error: null }
-        | { data: null; error: CustomError } {
-        if (this._data !== null) {
-            return { data: this._data, error: null };
+        | { data: DataType; error: null; isPending: false }
+        | { data: null; error: CustomError; isPending: false }
+        | { data: null; error: null; isPending: true } {
+        if (this._isPending) {
+            return { data: null, error: null, isPending: true };
         }
-
-        return { data: null, error: this._error as CustomError };
+        if (this._data !== null) {
+            return { data: this._data, error: null, isPending: false };
+        }
+        return { data: null, error: this._error as CustomError, isPending: false };
     }
 
     /**
@@ -207,6 +218,15 @@ export default class Result<DataType = MaybeData, CustomError = MaybeError> {
      */
     get isError(): boolean {
         return this._error !== null;
+    }
+
+    /**
+     * Checks whether the result represents a pending state.
+     *
+     * @returns `true` if the result is pending, otherwise `false`.
+     */
+    get isPending(): boolean {
+        return this._isPending;
     }
 }
 
