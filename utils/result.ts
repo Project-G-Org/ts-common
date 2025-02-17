@@ -1,3 +1,13 @@
+export type Nothing = null;
+
+export type MaybeError = Error | string | null
+export type MaybeData = NonNullable<unknown> | null
+
+/**
+ * @private - Using this outside the Result class is a bad practice for large scale projects. Prefer using custom error classes
+ */
+export type AnyError = string | Error
+
 /**
  * TODO - test the sit out of this
  * 
@@ -51,7 +61,7 @@ export default class Result<DataType = MaybeData, CustomError = MaybeError> {
     private _error: CustomError;
     private _isPending: boolean;
 
-    private constructor(data: DataType, error: CustomError, isPending: boolean = false) {
+    private constructor(data: DataType, error: CustomError, isPending = false) {
         this._data = data;
         this._error = error;
         this._isPending = isPending;
@@ -168,74 +178,23 @@ export default class Result<DataType = MaybeData, CustomError = MaybeError> {
         return { data: null, error: this._error as CustomError, isPending: false };
     }
 
-    /**
-     * Retrieves the success data, or `null` if the result is a failure.
-     *
-     * @returns The success data or `null`.
-     *
-     * @example
-     * const success = Result.succeed("Valid data");
-     * console.log(success.data); // "Valid data"
-     */
     get data(): MaybeData {
         return this._data as MaybeData;
     }
 
-    /**
-     * Retrieves the error message or object, or `null` if the result is a success.
-     *
-     * @returns The error or `null`.
-     *
-     * @example
-     * const failure = Result.failed("An error occurred");
-     * console.log(failure.error); // "An error occurred"
-     */
     get error(): MaybeError {
         return this._error as MaybeError;
     }
 
-    /**
-     * Checks whether the result represents a success.
-     *
-     * @returns `true` if the result is a success, otherwise `false`.
-     *
-     * @example
-     * const success = Result.succeed(100);
-     * console.log(success.isSuccess); // true
-     */
     get isSuccess(): boolean {
         return this._error === null;
     }
 
-    /**
-     * Checks whether the result represents a failure.
-     *
-     * @returns `true` if the result is a failure, otherwise `false`.
-     *
-     * @example
-     * const failure = Result.failed("Error occurred");
-     * console.log(failure.isError); // true
-     */
     get isError(): boolean {
         return this._error !== null;
     }
 
-    /**
-     * Checks whether the result represents a pending state.
-     *
-     * @returns `true` if the result is pending, otherwise `false`.
-     */
     get isPending(): boolean {
         return this._isPending;
     }
 }
-
-export type Nothing = null;
-
-export type MaybeError = Error | string | null
-export type MaybeData = NonNullable<unknown> | null
-
-/**
- * @todo - Using this outside the Result class is a bad practice for large scale projects. Prefer using custom error classes
- */
-export type AnyError = string | Error
