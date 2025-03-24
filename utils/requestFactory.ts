@@ -33,7 +33,9 @@ export type Request<Value, Params, Error> = (
  * );
  */
 export function requestFactory<Value, CustomError = RequestError>(
-  request: BaseRequest<unknown>,
+  // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+  request: BaseRequest<any>,
+  stopCatch = false,
 ): Request<Value, Parameters<typeof request>[0], CustomError | null> {
   return async (
     args: Parameters<typeof request>[0],
@@ -45,11 +47,11 @@ export function requestFactory<Value, CustomError = RequestError>(
         type RequestType = { message: CustomError };
         const { message: data }: RequestType = await response.json();
 
-        if (response.status === 404) {
+        if (response.status === 404 && !stopCatch) {
           throw new NotFoundError(data as string);
         }
 
-        if (response.status === 402) {
+        if (response.status === 402 && !stopCatch) {
           throw new PaymentRequiredError(data as string);
         }
 
@@ -57,10 +59,19 @@ export function requestFactory<Value, CustomError = RequestError>(
         throw new Error("Response's not okay");
       }
 
-      const { data }: { data: Value } = await response.json();
+      if (response.status !== 204) {
+        const data: Value = await response.json();
 
-      return Result.succeed(data);
+        return Result.succeed(data);
+      }
+      
+      return Result.succeed(null);
     } catch (error: unknown) {
+      if (stopCatch) {
+        console.error("Caught: ", error)
+        throw error
+      }
+
       if (error instanceof NotFoundError) {
         return Result.failed(error as CustomError);
       }
@@ -74,5 +85,3 @@ export function requestFactory<Value, CustomError = RequestError>(
     }
   };
 }
-
-
